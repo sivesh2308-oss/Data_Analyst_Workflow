@@ -17,6 +17,7 @@ This follows the order a data analyst actually works through a new file:
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from ui_theme import apply_theme, metric_card, style_axes, COLORS, CHART_PALETTE
 
 from file_io import read_any_file, SUPPORTED_TYPES
 from analysis import (
@@ -33,6 +34,7 @@ from analysis import (
 )
 
 st.set_page_config(page_title="Sales Analytics Dashboard", layout="wide")
+apply_theme()
 
 st.title("Sales Analytics Dashboard")
 st.caption("Upload a sales file (CSV or Excel) and explore it the way an analyst would.")
@@ -158,12 +160,14 @@ st.subheader("Revenue breakdown")
 col1, col2 = st.columns(2)
 with col1:
     fig, ax = plt.subplots()
-    metrics["by_region"].plot(kind="bar", ax=ax, color="#3B82F6")
+    metrics["by_region"].plot(kind="bar", ax=ax, color=[CHART_PALETTE[i % len(CHART_PALETTE)] for i in range(len(metrics["by_region"]))])
+    style_axes(ax)
     ax.set_title("Revenue by Region")
     st.pyplot(fig)
 with col2:
     fig, ax = plt.subplots()
-    metrics["by_product"].plot(kind="bar", ax=ax, color="#10B981")
+    metrics["by_product"].plot(kind="bar", ax=ax, color=[CHART_PALETTE[i % len(CHART_PALETTE)] for i in range(len(metrics["by_product"]))])
+    style_axes(ax)
     ax.set_title("Revenue by Product")
     st.pyplot(fig)
 
@@ -193,7 +197,8 @@ with st.expander("4 - Outlier detection (IQR method on revenue)"):
 with st.expander("5 - Day-of-week pattern"):
     dow = day_of_week_pattern(filtered)
     fig, ax = plt.subplots()
-    dow.plot(kind="bar", ax=ax, color="#F59E0B")
+    dow.plot(kind="bar", ax=ax, color=COLORS["amber"])
+    style_axes(ax)
     ax.set_title("Average Revenue by Day of Week")
     st.pyplot(fig)
 

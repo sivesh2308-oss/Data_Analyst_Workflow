@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from file_io import read_any_file, SUPPORTED_TYPES
+from ui_theme import apply_theme, metric_card, style_axes, COLORS, CHART_PALETTE
 from product_analysis import (
     data_quality_report,
     missing_required_columns,
@@ -28,6 +29,7 @@ from product_analysis import (
 )
 
 st.set_page_config(page_title="Product Ratings & Pricing Analyzer", layout="wide")
+apply_theme()
 
 st.title("Product Ratings & Pricing Analyzer")
 st.caption("For product-catalog data with price, rating, and category info (e.g. an Amazon product export) -- not transaction/sales data.")
@@ -110,19 +112,23 @@ st.subheader("Price and rating distribution")
 col1, col2 = st.columns(2)
 with col1:
     fig, ax = plt.subplots()
-    ax.hist(filtered["discounted_price"], bins=20, color="#3B82F6")
+    ax.hist(filtered["discounted_price"], bins=20, color=COLORS["indigo"], edgecolor="white")
+    style_axes(ax)
     ax.set_title("Price Distribution")
     st.pyplot(fig)
 with col2:
     fig, ax = plt.subplots()
-    ax.hist(filtered["rating"], bins=15, color="#10B981")
+    ax.hist(filtered["rating"], bins=15, color=COLORS["teal"], edgecolor="white")
+    style_axes(ax)
     ax.set_title("Rating Distribution")
     st.pyplot(fig)
 
 st.subheader("Category breakdown")
 cat_summary = category_summary(filtered)
 fig, ax = plt.subplots(figsize=(8, 4))
-cat_summary["product_count"].head(10).plot(kind="bar", ax=ax, color="#F59E0B")
+top10 = cat_summary["product_count"].head(10)
+cat_summary["product_count"].head(10).plot(kind="bar", ax=ax, color=[CHART_PALETTE[i % len(CHART_PALETTE)] for i in range(len(top10))])
+style_axes(ax)
 ax.set_title("Product Count by Category (Top 10)")
 st.pyplot(fig)
 st.dataframe(cat_summary)
@@ -130,7 +136,8 @@ st.dataframe(cat_summary)
 with st.expander("3 - Discount % vs Rating correlation"):
     st.dataframe(price_rating_correlation(filtered))
     fig, ax = plt.subplots()
-    ax.scatter(filtered["discount_percentage"], filtered["rating"], alpha=0.4, color="#8B5CF6")
+    ax.scatter(filtered["discount_percentage"], filtered["rating"], alpha=0.5, color=COLORS["indigo"])
+    style_axes(ax)
     ax.set_xlabel("Discount %")
     ax.set_ylabel("Rating")
     ax.set_title("Discount % vs Rating")

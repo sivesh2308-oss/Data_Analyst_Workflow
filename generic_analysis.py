@@ -126,9 +126,33 @@ def categorical_summary(df, column, top_n=10):
     return counts
 
 
-def datetime_trend(df, date_column, value_column=None):
+def detect_date_ambiguity(series):
+    """
+    Checks whether a date column's format is genuinely ambiguous -- e.g.
+    '03-01-2025' could be Jan 3 or Mar 1, and no amount of pattern-matching
+    can know which without a human telling it. Returns True if a meaningful
+    fraction of values have both parts <= 12 (so day-first vs month-first
+    actually changes the answer).
+    """
+    import re
+    sample = series.dropna().astype(str).head(500)
+    ambiguous, total = 0, 0
+    for val in sample:
+        parts = re.split(r"[-/]", val.strip())
+        if len(parts) >= 2:
+            try:
+                a, b = int(parts[0]), int(parts[1])
+            except ValueError:
+                continue
+            total += 1
+            if a <= 12 and b <= 12 and a != b:
+                ambiguous += 1
+    return total > 0 and (ambiguous / total) > 0.1
+
+
+def datetime_trend(df, date_column, value_column=None, dayfirst=False):
     """Row count over time, or sum of value_column over time if numeric column given."""
-    dates = pd.to_datetime(df[date_column], errors="coerce")
+    dates = pd.to_datetime(df[date_column], errors="coerce", dayfirst=dayfirst)
     temp = df.copy()
     temp["_date"] = dates
     temp = temp.dropna(subset=["_date"])
@@ -247,9 +271,12 @@ def guess_category_column(categorical_cols):
     return categorical_cols[0] if categorical_cols else None
 
 
-def compute_kpis(df, amount_col, date_col=None, category_col=None):
+def compute_kpis(df, amount_col, date_col=None, category_col=None, dayfirst=False):
     """Core KPI numbers, all computed directly from the data — no assumptions
-    beyond which columns represent amount/date/category (shown to the user)."""
+    beyond which columns represent amount/date/category (shown to the user).
+    dayfirst controls how ambiguous dates like 03-01-2025 are read (Jan 3 vs
+    Mar 1) -- this genuinely can't be auto-detected with certainty, so it's
+    a user-facing choice rather than a silent guess."""
     amounts = _try_numeric(df[amount_col]).dropna()
     kpis = {
         "total": round(amounts.sum(), 2),
@@ -262,7 +289,7 @@ def compute_kpis(df, amount_col, date_col=None, category_col=None):
 
     if date_col:
         temp = df.copy()
-        temp["_date"] = pd.to_datetime(temp[date_col], errors="coerce")
+        temp["_date"] = pd.to_datetime(temp[date_col], errors="coerce", dayfirst=dayfirst)
         temp["_amount"] = _try_numeric(temp[amount_col])
         temp = temp.dropna(subset=["_date", "_amount"])
         if not temp.empty:
@@ -331,3 +358,114 @@ def build_report_text(filename, overview_dict, quality_notes, kpis, amount_col, 
             lines.append(f"- {period}: {val:,.2f}")
 
     return "\n".join(lines)
+
+
+# ---------- Category standardization (case/whitespace variants and typos) ----------
+
+def find_case_variants(df, column):
+    """
+    Groups values that are identical except for case/whitespace -- the exact
+    'South' vs 'south' vs 'SOUth' problem. These are unambiguous: they ARE
+    the same category, just typed inconsistently, so this is safe to
+    auto-fix without human review (unlike the fuzzy-typo check below).
+    Returns {normalized_key: [count of rows, {original_value: row_count}]}
+    for only the groups that actually have more than one spelling.
+    """
+    s = df[column].dropna().astype(str)
+    groups = {}
+    for val in s:
+        key = val.strip().lower()
+        groups.setdefault(key, {})
+        groups[key][val] = groups[key].get(val, 0) + 1
+
+    return {k: v for k, v in groups.items() if len(v) > 1}
+
+
+def standardize_case_whitespace(df, column, target_case="title"):
+    """
+    Safe, deterministic fix: trims whitespace and normalizes case so
+    'South', 'south', ' SOUth' all become one value. target_case is
+    'title', 'upper', or 'lower'.
+    """
+    df = df.copy()
+    cleaned = df[column].astype(str).str.strip()
+    if target_case == "title":
+        cleaned = cleaned.str.title()
+    elif target_case == "upper":
+        cleaned = cleaned.str.upper()
+    elif target_case == "lower":
+        cleaned = cleaned.str.lower()
+    df[column] = cleaned
+    return df
+
+
+def find_fuzzy_variants(df, column, cutoff=0.82, max_groups=15):
+    """
+    Suggests possible TYPO-based duplicates beyond case/whitespace, e.g.
+    'Sout' vs 'South'. Unlike find_case_variants, this is NEVER auto-applied
+    -- two genuinely different categories (e.g. 'North' and 'Northeast')
+    can look similar, so a human must confirm each merge. Returns a dict of
+    {suggested_canonical_value: [similar_value, ...]}, most-frequent-first.
+    """
+    import difflib
+    s = df[column].dropna().astype(str).str.strip()
+    counts = s.value_counts()
+    unique_vals = list(counts.index)
+
+    seen = set()
+    suggestions = {}
+    for val in unique_vals:
+        if val in seen or len(suggestions) >= max_groups:
+            continue
+        candidates = [v for v in unique_vals if v != val and v.lower() != val.lower() and v not in seen]
+        matches = difflib.get_close_matches(val, candidates, n=5, cutoff=cutoff)
+        if matches:
+            suggestions[val] = matches
+            seen.update([val] + matches)
+    return suggestions
+
+
+def apply_category_merge(df, column, mapping):
+    """mapping: {original_value: canonical_value} -- applies a confirmed merge."""
+    df = df.copy()
+    df[column] = df[column].astype(str).replace(mapping)
+    return df
+
+
+# ---------- Date format ambiguity ----------
+
+def parse_dates_with_dayfirst(series, dayfirst=None):
+    """
+    03-01-2025 is genuinely ambiguous (Jan 3 or Mar 1?) -- no tool can resolve
+    that without knowing the source's convention. dayfirst=None lets pandas
+    infer per-value (its 'mixed' format mode); True/False forces a consistent
+    interpretation across the whole column once the user tells us which.
+    """
+    if dayfirst is None:
+        return pd.to_datetime(series, errors="coerce", format="mixed")
+    return pd.to_datetime(series, errors="coerce", dayfirst=dayfirst)
+
+
+# ---------- Simple forecasting ----------
+
+def forecast_linear(monthly_series, periods_ahead=3):
+    """
+    Naive linear trend projection (least-squares fit) on a period-indexed
+    series. This is NOT a sophisticated forecast -- it assumes the recent
+    trend continues in a straight line, which real business data rarely
+    does exactly. Useful as a rough "if this keeps up" estimate, not a
+    guarantee -- the report and UI both label it as such.
+    """
+    import numpy as np
+    if len(monthly_series) < 2:
+        return pd.Series(dtype=float)
+
+    x = np.arange(len(monthly_series))
+    y = monthly_series.values.astype(float)
+    slope, intercept = np.polyfit(x, y, 1)
+
+    future_x = np.arange(len(monthly_series), len(monthly_series) + periods_ahead)
+    future_vals = slope * future_x + intercept
+    future_periods = pd.period_range(monthly_series.index[-1] + 1, periods=periods_ahead,
+                                      freq=monthly_series.index.freq)
+    return pd.Series(future_vals, index=future_periods)
