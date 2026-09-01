@@ -1,4 +1,4 @@
-# Sales Analytics Dashboard
+# Data-Analyst-Workflow
 
 A local Python script that analyzes sales data and produces charts + a written summary report — no external services or APIs, runs fully offline.
 
