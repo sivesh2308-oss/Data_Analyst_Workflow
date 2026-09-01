@@ -53,7 +53,7 @@ import json
 st.set_page_config(page_title="Data Analyst Workflow", layout="wide")
 apply_theme()
 st.title("Data Analyst Workflow")
-st.caption("Upload -> Clean -> KPI Insights -> Report. Works on any CSV or Excel file.")
+st.caption("Upload → Profile → Clean → Analyze → Compare → Report")
 
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=SUPPORTED_TYPES)
 if uploaded_file is None:
