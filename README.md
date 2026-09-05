@@ -1,132 +1,57 @@
-# Data-Analyst-Workflow
+# Data Analyst Workflow
 
-A local Python script that analyzes sales data and produces charts + a written summary report — no external services or APIs, runs fully offline.
+**Live app:** https://data-analyst-workflow.streamlit.app/
+**Repo:** https://github.com/sivesh2308-oss/Data_Analyst_Workflow
+
+A Streamlit tool that runs the actual data analyst workflow — **Upload → Clean → KPI Insights → Report** — on any CSV or Excel file, not just one fixed format. Built and hardened by testing against real messy datasets (Amazon product exports, Kaggle sales data, a coffee shop POS export, a wide-format stats file) rather than designed in the abstract.
 
 ## What it does
 
-- Loads a sales CSV and cleans it (handles missing/invalid rows)
-- Computes:
-  - Total revenue, total units, average order value
-  - Revenue broken down by region and by product
-  - Monthly revenue trend and month-over-month growth %
-  - 3-month moving average (smooths short-term noise)
-  - Correlation between units sold and revenue
-  - Top 3 best-selling products
-- Saves 3 charts (`revenue_by_region.png`, `revenue_by_product.png`, `monthly_trend.png`)
-- Writes a plain-text summary (`report.md`)
+- **Reads almost anything**: CSV or Excel, auto-detects delimiter (comma/semicolon/tab), handles non-UTF-8 encodings, skips junk title rows before the real header, strips currency symbols and thousands separators (`₹1,299`, `$1,257`, `45%`)
+- **Cleans data like an analyst would**: flags duplicates, missing values, and suspicious negative values in price/quantity/sales columns; standardizes inconsistent category spelling (`South` / `south` / `SOUth` → one value automatically; typo-like variants such as `Sout` flagged for manual confirmation, never auto-merged)
+- **Detects KPIs, but never guesses silently**: auto-suggests which column is "amount," "date," and "category" by name — always shown for you to confirm or override, because that's a business judgment call, not something a tool can know for certain
+- **Handles ambiguous dates**: `03-01-2025` could be Jan 3 or Mar 1 — you're prompted to resolve it instead of getting a silently wrong answer
+- **Forecasts**: simple linear trend projection on monthly totals (clearly labeled as a naive projection, not a real forecasting model)
+- **Compares two files**: upload a second period and see totals/averages/category breakdowns side by side with deltas
+- **Remembers your column choices**: downloadable `mapping.json` so re-uploading a similar file next time doesn't require re-mapping from scratch
+- **Generates a real report**: downloadable Markdown report — every number in it is computed directly from your data, nothing is AI-generated text
+
+## Why this matters more than it sounds
+
+Most "analyze my CSV" demos work great on one clean sample file and break on the first real file someone uploads. This one was built the other way around: I fed it a coffee shop POS export, an Amazon product dataset, a Superstore sales file, and a wide-format stats file — and fixed the real bugs each one surfaced (a datetime column silently miscast as nanosecond integers, non-UTF-8 encoding crashes, quote-aware CSV parsing so review text with commas doesn't corrupt column detection, and more). The full list of what broke and how it was fixed is in the commit history.
 
 ## Tech stack
 
-Python, Pandas, Matplotlib
+Python · Pandas · Streamlit · Matplotlib · openpyxl
 
-## How to run
-
-```bash
-pip install pandas matplotlib
-python analyze_sales.py sales_data.csv
-```
-
-Replace `sales_data.csv` with your own file — it just needs columns: `date, region, product, units, revenue`.
-
-## Sample output
-
-See `report.md` and the generated PNG charts after running.
-
-## Web app version (recommended)
-
-Run it as an interactive local dashboard instead of a script:
+## Run it locally
 
 ```bash
-pip install pandas matplotlib streamlit
-streamlit run app.py
-```
-
-This opens automatically at `http://localhost:8501` in your browser. It includes:
-- **Data quality report** — missing values, duplicates, dtypes (always check this first)
-- **Descriptive statistics** — mean/median/std/quartiles
-- **Filters** — by region, product, date range
-- **Pareto analysis** — which products drive 80% of revenue
-- **Outlier detection** — IQR method
-- **Day-of-week seasonality**
-- **Correlation matrix**
-- **CSV export** of filtered data
-
-## Project structure
-
-- `analyze_sales.py` — original CLI script for sales data (charts + report.md)
-- `analysis.py` — shared analytics functions for **transaction-level sales data** (date, region, product, units, revenue)
-- `app.py` — Streamlit web app for sales data (interactive, recommended)
-- `sales_data.csv` — sample sales data
-
-- `product_analysis.py` — analytics functions for **product-level catalog data** (price, rating, category, reviews — e.g. an Amazon product export)
-- `product_app.py` — Streamlit web app for product/rating/pricing data
-- `product_sample.csv` — sample product data
-
-- `generic_analysis.py` — column-type inference, cleaning (duplicates/missing/invalid values), auto KPI detection, and report generation for **any** data
-- `auto_explorer.py` — Streamlit app implementing the full analyst workflow: **Upload → Clean → KPI Insights → Report**, on any CSV or Excel file, with manual override for every auto-detected column
-
-## Why three apps?
-
-A sales-transaction file tells you *what sold, when, and for how much*.
-A product catalog tells you *what exists, its price, and its rating*.
-There's no single fixed schema that fits both — and no tool can invent a
-"revenue trend" from data that never recorded one. Rather than force one
-tool to fake numbers that aren't in the data, this repo has:
-
-1. **`auto_explorer.py`** — the front door, and the one that follows the real analyst
-   workflow: **Upload → Clean (duplicates, missing values, suspicious negatives) →
-   KPI Insights (auto-detected amount/date/category, always shown and editable) →
-   Downloadable Markdown report.** Every KPI number is computed directly from your
-   data — nothing is AI-generated. The one thing it can't do automatically is know
-   which column *means* "revenue" with certainty — that's a business judgment call,
-   so it guesses from column names and always shows you the guess to confirm or change.
-2. **`app.py`** — for sales/transaction data, once you map columns to
-   date/region/product/units/revenue, you get business metrics (growth,
-   Pareto, seasonality) that require knowing what the columns *mean*.
-3. **`product_app.py`** — same idea, for product/rating/pricing data.
-
-## Run the auto explorer (works on any file)
-
-```bash
-pip install pandas matplotlib streamlit
+git clone https://github.com/sivesh2308-oss/Data_Analyst_Workflow.git
+cd Data_Analyst_Workflow
+pip install -r requirements.txt
 streamlit run auto_explorer.py
 ```
 
-## Run the product analyzer
+Opens at `http://localhost:8501`. Upload any sales-shaped CSV or Excel file — there's no built-in sample data, since the whole point of this tool is handling files it's never seen before. Don't have a file handy? The UCI "Online Retail II" dataset (archive.ics.uci.edu) is a good real-world stress test — messy encoding, returns, missing customer IDs and all.
 
-```bash
-pip install pandas matplotlib streamlit
-streamlit run product_app.py
-```
+## Project structure
 
+| File | Purpose |
+|---|---|
+| `auto_explorer.py` | Main app — the full analyst workflow, works on any file |
+| `generic_analysis.py` | Column-type inference, cleaning, KPI auto-detection, forecasting, report generation |
+| `file_io.py` | Robust file reading — encoding fallback, delimiter detection, junk-row skipping |
+| `ui_theme.py` | Shared visual identity used across all apps |
+| `app.py` | Specialized dashboard for sales/transaction data (date, region, product, units, revenue) |
+| `product_app.py` | Specialized dashboard for product/rating/pricing data (e.g. Amazon exports) |
+| `analysis.py`, `product_analysis.py` | Business-metric logic behind the two specialized dashboards |
+| `analyze_sales.py` | Original command-line version (no server needed) |
 
+## Design note: why three apps instead of one
 
-## Compatible file types
+A sales-transaction file tells you *what sold, when, and for how much*. A product catalog tells you *what exists, its price, and its rating*. There's no single schema that fits both, and no tool can invent a "revenue trend" from data that never recorded one. `auto_explorer.py` is the general-purpose front door — it profiles and cleans anything. `app.py` and `product_app.py` layer business-specific metrics on top once you confirm what the columns mean.
 
-All three apps accept **CSV or Excel (.xlsx/.xls)**. File loading is handled by
-`file_io.py`, tested against real messy files including: non-UTF-8 encodings,
-semicolon- or tab-delimited exports (common outside the US), title/metadata
-rows before the real header, trailing "Total" summary rows, and BOM characters
-from Excel's "CSV UTF-8" export. It tries the standard parse first and only
-falls back to sniffing delimiter/header when the standard parse actually looks
-wrong -- so well-formed files (including ones with commas inside quoted text,
-like review content) are never second-guessed.
+## What "works on any file" actually means here
 
-Numeric cleaning (`file_io.clean_numeric`) handles currency symbols, thousands
-separators, and percent signs (`₹1,299`, `$1,257`, `45%`) consistently across
-all three apps -- one shared implementation, not three separate ones, so a fix
-in one place fixes it everywhere.
-
-The sales app's column-mapping step also supports **deriving revenue from
-Price x Quantity** when a file has no single revenue/total column (common in
-per-item sales logs, e.g. a coffee shop's unit_price + transaction_qty).
-
-## What "universal" actually means here
-
-Every file-reading and cleaning fix above was driven by a real file breaking
-it first -- not designed in the abstract. The honest limit: the app can
-reliably parse and clean *any* CSV/Excel structure, but it can't guarantee
-which column means "revenue" without either matching a known name or a human
-confirming it -- that's a business judgment call, not a parsing problem, and
-`auto_explorer.py` always shows its guess for you to confirm or override
-rather than deciding silently.
+It reliably parses and cleans arbitrary CSV/Excel structure. It cannot guarantee which column means "revenue" without either a name match or your confirmation — that's a judgment call, not a parsing problem, so the app always shows its guess instead of deciding silently.
