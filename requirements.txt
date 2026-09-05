@@ -2,3 +2,4 @@ pandas
 matplotlib
 streamlit
 openpyxl
+mcp[cli]<2
