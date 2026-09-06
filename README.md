@@ -55,3 +55,44 @@ A sales-transaction file tells you *what sold, when, and for how much*. A produc
 ## What "works on any file" actually means here
 
 It reliably parses and cleans arbitrary CSV/Excel structure. It cannot guarantee which column means "revenue" without either a name match or your confirmation — that's a judgment call, not a parsing problem, so the app always shows its guess instead of deciding silently.
+
+## MCP Server
+
+This project also exposes its core analysis engine (`generic_analysis.py`, `file_io.py`) as an [MCP](https://modelcontextprotocol.io) server, so any MCP-compatible AI client (like Claude Desktop) can drive the actual pandas logic directly — not guess at numbers itself.
+
+**Available tools:**
+- `load_file` — robust CSV/Excel loading (encoding fallback, delimiter sniffing, junk-row removal)
+- `get_column_types` — column type inference (numeric/datetime/categorical/text)
+- `get_overview` — shape, duplicates, missing values
+- `get_numeric_summary` / `get_outliers` — per-column numeric stats and IQR outlier detection
+- `get_categorical_summary` — top values in a categorical column
+- `check_date_ambiguity` — flags ambiguous date formats for user confirmation
+- `get_data_quality_report` — duplicates, missing values, suspicious negatives
+- `get_category_variants` — case/whitespace duplicates and fuzzy-typo suggestions
+- `get_kpis` — totals, averages, monthly trend, category breakdown
+- `get_forecast` — naive linear trend projection
+- `generate_report` — full Markdown report
+
+**Design principle:** the LLM client never computes numbers itself — every figure comes from a real tool call to the pandas engine. The LLM only narrates or asks clarifying questions (e.g. which column is the date/amount/category), consistent with this project's "never silently assume" philosophy.
+
+### Running it locally
+
+```bash
+pip install "mcp[cli]<2"
+python mcp_server.py
+```
+
+### Connecting to Claude Desktop
+
+Add this to your `claude_desktop_config.json` under `mcpServers`:
+
+```json
+"mcpServers": {
+  "data-analyst-workflow": {
+    "command": "python",
+    "args": ["D:\\sales-analytics-dashboard\\mcp_server.py"]
+  }
+}
+```
+
+Restart Claude Desktop, enable the connector in a chat, and ask it to load and analyze a file.
