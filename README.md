@@ -61,7 +61,8 @@ It reliably parses and cleans arbitrary CSV/Excel structure. It cannot guarantee
 This project also exposes its core analysis engine (`generic_analysis.py`, `file_io.py`) as an [MCP](https://modelcontextprotocol.io) server, so any MCP-compatible AI client (like Claude Desktop) can drive the actual pandas logic directly — not guess at numbers itself.
 
 **Available tools:**
-- `load_file` — robust CSV/Excel loading (encoding fallback, delimiter sniffing, junk-row removal)
+- `load_csv_text` — load a CSV passed as text (works on the hosted server; returns a `dataframe_id`)
+- `load_file` — robust CSV/Excel loading from a file path (local use only; encoding fallback, delimiter sniffing, junk-row removal)
 - `get_column_types` — column type inference (numeric/datetime/categorical/text)
 - `get_overview` — shape, duplicates, missing values
 - `get_numeric_summary` / `get_outliers` — per-column numeric stats and IQR outlier detection
@@ -78,7 +79,7 @@ This project also exposes its core analysis engine (`generic_analysis.py`, `file
 ### Running it locally
 
 ```bash
-pip install "mcp[cli]<2"
+pip install -r requirements.txt
 python mcp_server.py
 ```
 
@@ -94,5 +95,32 @@ Add this to your `claude_desktop_config.json` under `mcpServers`:
   }
 }
 ```
+Replace the path with the full path to mcp_server.py on your machine.
 
 Restart Claude Desktop, enable the connector in a chat, and ask it to load and analyze a file.
+
+### Hosted MCP server
+
+A hosted instance of the server is deployed on Render:
+
+| | |
+|---|---|
+| **Endpoint** | `https://data-analyst-workflow.onrender.com/mcp` |
+| **Transport** | Streamable HTTP |
+| **Authentication** | None (demo instance) |
+
+**Connect with any MCP client that supports Streamable HTTP**, for example the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+1. Run `npx @modelcontextprotocol/inspector`
+2. Add a server, choose the HTTP / Streamable HTTP transport, and enter the endpoint above
+3. Open the **Tools** tab to see and call the available tools
+
+**How to use your own data**
+1. Call `load_csv_text` with your CSV content as text. It returns a `dataframe_id`.
+2. Pass that `dataframe_id` to any other tool (`get_overview`, `get_kpis`, `get_forecast`, `generate_report`, ...).
+
+**Notes**
+- `load_csv_text` accepts CSV text up to about 5 MB. Excel files aren't supported on the hosted server yet.
+- `load_file` (reads a file path) works only when running the server locally, and is disabled on the hosted instance.
+- Datasets are kept in memory only (the most recent 20 are kept) and are wiped when the server restarts.
+- Hosted on Render's free tier, so the first request after inactivity can take about 50 seconds.
