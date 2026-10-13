@@ -198,6 +198,24 @@ def load_csv_text(csv_text: str, filename: str = "data.csv") -> dict:
         "cleanup_notes": notes,
     }
 
+from starlette.requests import Request
+from starlette.responses import HTMLResponse
+
+
+@mcp.custom_route("/", methods=["GET"])
+async def home(request: Request):
+    return HTMLResponse("""
+    <html><head><title>Data Analyst Workflow MCP</title></head>
+    <body style="font-family:sans-serif;max-width:640px;margin:40px auto;line-height:1.5">
+    <h2>Data Analyst Workflow - MCP server</h2>
+    <p>This is an MCP server for AI clients, not a web page.
+    Connect an MCP client to: <code>https://data-analyst-workflow.onrender.com/mcp</code></p>
+    <p>Just want to analyze a file in your browser? Use the web app:
+    <a href="https://data-analyst-workflow.streamlit.app/">data-analyst-workflow.streamlit.app</a></p>
+    <p>Code and docs: <a href="https://github.com/sivesh2308-oss/Data_Analyst_Workflow">GitHub</a></p>
+    </body></html>
+    """)
+
 if __name__ == "__main__":
     if _port:   # hosted on Render -> HTTP
         mcp.run(transport="streamable-http")
