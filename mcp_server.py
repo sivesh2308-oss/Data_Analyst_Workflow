@@ -9,6 +9,8 @@ client only ever reads results, never computes them.
 from mcp.server.fastmcp import FastMCP
 import pandas as pd
 import os
+import uuid
+import io
 
 from file_io import read_any_file, get_excel_sheet_names
 from generic_analysis import (
@@ -51,6 +53,8 @@ def load_file(file_path: str) -> dict:
     """Load a CSV/Excel file with the project's robust reader (encoding
     fallback, delimiter sniffing, junk-row removal). Returns a dataframe_id
     to use in every other tool call, plus any cleanup notes."""
+    if os.environ.get("PORT"):
+        raise ValueError("load_file is disabled on the hosted server. Use load_csv_text instead.")
     with open(file_path, "rb") as f:  # read_any_file checks .name for .xlsx/.xls
         df, notes = read_any_file(f)
     _dataframes[file_path] = df
@@ -164,6 +168,35 @@ def generate_report(dataframe_id: str, filename: str, amount_col: str,
     kpis = compute_kpis(df, amount_col, date_col, category_col, dayfirst)
     return build_report_text(filename, ov, [], kpis, amount_col, date_col, category_col)
 
+
+MAX_FRAMES = 20
+MAX_CSV_CHARS = 5_000_000
+
+
+def _store(df):
+    """Keep a dataframe in memory under a random id (oldest dropped past the cap)."""
+    if len(_dataframes) >= MAX_FRAMES:
+        _dataframes.pop(next(iter(_dataframes)))
+    df_id = uuid.uuid4().hex[:8]
+    _dataframes[df_id] = df
+    return df_id
+
+
+@mcp.tool()
+def load_csv_text(csv_text: str, filename: str = "data.csv") -> dict:
+    """Load a CSV given as text. Returns a dataframe_id to use in every
+    other tool call, plus any cleanup notes."""
+    if len(csv_text) > MAX_CSV_CHARS:
+        raise ValueError("CSV is too large (limit about 5 MB).")
+    buf = io.BytesIO(csv_text.encode("utf-8"))
+    buf.name = filename
+    df, notes = read_any_file(buf)
+    return {
+        "dataframe_id": _store(df),
+        "rows": len(df),
+        "columns": list(df.columns),
+        "cleanup_notes": notes,
+    }
 
 if __name__ == "__main__":
     if _port:   # hosted on Render -> HTTP
