@@ -90,7 +90,7 @@ Add this to your `claude_desktop_config.json` under `mcpServers`:
 "mcpServers": {
   "data-analyst-workflow": {
     "command": "python",
-    "args": ["D:\\sales-analytics-dashboard\\mcp_server.py"]
+    "args": ["D:\\data_analyst_workflow\\mcp_server.py"]
   }
 }
 ```
