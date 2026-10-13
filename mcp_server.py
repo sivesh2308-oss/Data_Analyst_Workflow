@@ -160,4 +160,9 @@ def generate_report(dataframe_id: str, filename: str, amount_col: str,
 
 
 if __name__ == "__main__":
-    mcp.run()
+    import os
+    port = os.environ.get("PORT")
+    if port:  # running on Render -> HTTP
+        mcp.run(transport="streamable-http", host="0.0.0.0", port=int(port))
+    else:     # running locally -> stdio (Claude Desktop)
+        mcp.run()
