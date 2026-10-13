@@ -124,3 +124,14 @@ A hosted instance of the server is deployed on Render:
 - `load_file` (reads a file path) works only when running the server locally, and is disabled on the hosted instance.
 - Datasets are kept in memory only (the most recent 20 are kept) and are wiped when the server restarts.
 - Hosted on Render's free tier, so the first request after inactivity can take about 50 seconds.
+
+**Who is this for?**
+- Non-technical users: use the web app at https://data-analyst-workflow.streamlit.app/
+- People with MCP-capable AI tools: connect to `https://data-analyst-workflow.onrender.com/mcp`
+
+**Connect from Claude Desktop** (add to `claude_desktop_config.json` under `mcpServers`):
+
+"data-analyst-workflow-remote": {
+  "command": "npx",
+  "args": ["mcp-remote", "https://data-analyst-workflow.onrender.com/mcp"]
+}
