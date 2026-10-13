@@ -8,6 +8,7 @@ client only ever reads results, never computes them.
 
 from mcp.server.fastmcp import FastMCP
 import pandas as pd
+import os
 
 from file_io import read_any_file, get_excel_sheet_names
 from generic_analysis import (
@@ -28,7 +29,12 @@ from generic_analysis import (
     forecast_linear,
 )
 
-mcp = FastMCP("data-analyst-workflow")
+_port = os.environ.get("PORT")
+mcp = FastMCP(
+    "data-analyst-workflow",
+    host="0.0.0.0" if _port else "127.0.0.1",
+    port=int(_port) if _port else 8000,
+)
 
 # in-memory store: dataframe_id -> DataFrame
 _dataframes: dict[str, pd.DataFrame] = {}
@@ -160,9 +166,7 @@ def generate_report(dataframe_id: str, filename: str, amount_col: str,
 
 
 if __name__ == "__main__":
-    import os
-    port = os.environ.get("PORT")
-    if port:  # running on Render -> HTTP
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=int(port))
-    else:     # running locally -> stdio (Claude Desktop)
+    if _port:   # hosted on Render -> HTTP
+        mcp.run(transport="streamable-http")
+    else:       # local -> stdio for Claude Desktop
         mcp.run()
